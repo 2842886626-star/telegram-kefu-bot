@@ -1,44 +1,27 @@
 import os
 import logging
 
-from telegram import (
-    Update,
-    InlineKeyboardButton,
-    InlineKeyboardMarkup,
-    BotCommand,
-    MenuButtonWebApp,
-    WebAppInfo,
-)
+from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
     Application,
     CommandHandler,
-    CallbackQueryHandler,
     MessageHandler,
     ContextTypes,
     filters,
 )
 
-# ============================================================
-# 配置
-# ============================================================
+# =========================
+# 基础设置
+# =========================
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
+
 BASE_URL = os.getenv(
     "BASE_URL",
     "https://telegram-kefu-bot.onrender.com"
-).rstrip("/")
-
-SERVICE_USERNAME = os.getenv(
-    "SERVICE_USERNAME",
-    ""
-).strip()
+).strip().rstrip("/")
 
 PORT = int(os.getenv("PORT", "10000"))
-
-
-# ============================================================
-# 日志
-# ============================================================
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -48,149 +31,124 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-# ============================================================
-# 业务内容
-# ============================================================
+# =========================
+# 2列 × 5行菜单
+# =========================
 
-BUSINESS_TEXT = {
-    "special_group": (
+def main_menu():
+
+    keyboard = [
+        ["拉专群", "开公群"],
+        ["咨询 / 解封", "广告 / 会员"],
+        ["纠纷 / 举报", "资源对接"],
+        ["投诉建议", "自助验群"],
+        ["销群恢复", "新手必读"],
+    ]
+
+    return ReplyKeyboardMarkup(
+        keyboard,
+        resize_keyboard=True,
+        one_time_keyboard=False,
+        input_field_placeholder="请选择业务",
+    )
+
+
+# =========================
+# 欢迎消息
+# =========================
+
+WELCOME_TEXT = (
+    "您好，这里是熊猫担保在线人工客服。\n\n"
+    "请点击下方对应的业务板块，选择您要办理的业务。\n\n"
+    "验群请点击「自助验群」，输入您所在的群编号验证。"
+)
+
+
+# =========================
+# 业务回复
+# =========================
+
+BUSINESS = {
+
+    "拉专群": (
         "拉专群\n\n"
-        "如需创建或咨询专属群组，请联系客服。\n\n"
-        "请提供：\n"
-        "• 群组用途\n"
-        "• 预计人数\n"
-        "• 需要的服务"
+        "如需创建或咨询专属群组，请提供以下信息：\n\n"
+        "群组用途\n"
+        "预计人数\n"
+        "需要的服务\n\n"
+        "提交后工作人员会进一步处理。"
     ),
 
-    "public_group": (
+    "开公群": (
         "开公群\n\n"
-        "如需创建公开群组，请联系客服。\n\n"
-        "请提供：\n"
-        "• 群组名称\n"
-        "• 群组类型\n"
-        "• 群组用途"
+        "如需开设公开群组，请提供：\n\n"
+        "群组名称\n"
+        "群组类型\n"
+        "群组用途\n\n"
+        "工作人员会根据情况进行处理。"
     ),
 
-    "consult": (
+    "咨询 / 解封": (
         "咨询 / 解封\n\n"
         "如果您的账号、群组或相关业务遇到问题，"
-        "可以联系客服进行咨询。\n\n"
-        "请尽量提供详细情况。"
+        "可以在这里进行咨询。\n\n"
+        "请尽量详细描述遇到的问题，"
+        "方便工作人员处理。"
     ),
 
-    "ad_member": (
+    "广告 / 会员": (
         "广告 / 会员\n\n"
-        "如需咨询广告发布、会员服务等业务，"
-        "请联系客服了解具体方案。"
+        "如需咨询广告发布或会员服务，"
+        "请说明您的具体需求以及预计时间。"
     ),
 
-    "report": (
+    "纠纷 / 举报": (
         "纠纷 / 举报\n\n"
-        "如发现违规内容或存在纠纷，请提交相关信息。\n\n"
-        "建议提供：\n"
-        "• 群组 / 用户信息\n"
-        "• 相关截图\n"
-        "• 具体问题描述"
+        "如发现违规内容或存在纠纷，"
+        "请提供相关群组、用户信息以及具体情况。\n\n"
+        "工作人员会进行核实。"
     ),
 
-    "resource": (
+    "资源对接": (
         "资源对接\n\n"
         "如有合作、资源交换或商务对接需求，"
-        "请联系客服。"
+        "请简单介绍您的资源以及合作需求。"
     ),
 
-    "suggestion": (
+    "投诉建议": (
         "投诉建议\n\n"
         "如果您对服务有意见、建议或投诉，"
-        "可以提交相关情况。"
+        "请详细说明相关情况。\n\n"
+        "我们会认真处理您的反馈。"
     ),
 
-    "verify": (
+    "自助验群": (
         "自助验群\n\n"
-        "请输入您所在的群编号进行验证。"
+        "请输入您所在的群编号进行验证。\n\n"
+        "例如：\n"
+        "123456789\n\n"
+        "请直接发送群编号。"
     ),
 
-    "restore": (
+    "销群恢复": (
         "销群恢复\n\n"
         "如果群组出现异常、误操作或需要恢复相关服务，"
-        "请联系客服咨询。"
+        "请提供群组编号或相关信息进行咨询。"
     ),
 
-    "guide": (
+    "新手必读": (
         "新手必读\n\n"
         "1. 请勿相信陌生人发送的可疑链接。\n"
         "2. 不要向任何人泄露密码或验证码。\n"
         "3. 办理业务时请提供准确的信息。\n"
-        "4. 遇到问题可以联系客服。"
+        "4. 遇到问题可以通过菜单选择对应业务。"
     ),
 }
 
 
-# ============================================================
-# 机器人消息里的业务菜单
-# ============================================================
-
-def bot_business_menu():
-
-    keyboard = [
-        [
-            InlineKeyboardButton(
-                "拉专群",
-                callback_data="special_group"
-            ),
-            InlineKeyboardButton(
-                "开公群",
-                callback_data="public_group"
-            ),
-        ],
-        [
-            InlineKeyboardButton(
-                "咨询 / 解封",
-                callback_data="consult"
-            ),
-            InlineKeyboardButton(
-                "广告 / 会员",
-                callback_data="ad_member"
-            ),
-        ],
-        [
-            InlineKeyboardButton(
-                "纠纷 / 举报",
-                callback_data="report"
-            ),
-            InlineKeyboardButton(
-                "资源对接",
-                callback_data="resource"
-            ),
-        ],
-        [
-            InlineKeyboardButton(
-                "投诉建议",
-                callback_data="suggestion"
-            ),
-            InlineKeyboardButton(
-                "自助验群",
-                callback_data="verify"
-            ),
-        ],
-        [
-            InlineKeyboardButton(
-                "销群恢复",
-                callback_data="restore"
-            ),
-            InlineKeyboardButton(
-                "新手必读",
-                callback_data="guide"
-            ),
-        ],
-    ]
-
-    return InlineKeyboardMarkup(keyboard)
-
-
-# ============================================================
+# =========================
 # /start
-# ============================================================
+# =========================
 
 async def start(
     update: Update,
@@ -200,180 +158,15 @@ async def start(
     if not update.message:
         return
 
-    text = (
-        "您好，这里是在线人工客服。\n\n"
-        "请点击下方对应的业务板块，"
-        "选择您要办理的业务。\n\n"
-        "验群请点击「自助验群」，"
-        "输入您所在的群编号进行验证。"
-    )
-
     await update.message.reply_text(
-        text,
-        reply_markup=bot_business_menu(),
+        WELCOME_TEXT,
+        reply_markup=main_menu()
     )
 
 
-# ============================================================
-# /menu
-# ============================================================
-
-async def menu(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
-
-    if not update.message:
-        return
-
-    await update.message.reply_text(
-        "业务菜单\n\n"
-        "请选择您要办理的业务：",
-        reply_markup=bot_business_menu(),
-    )
-
-
-# ============================================================
-# /service
-# ============================================================
-
-async def service(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
-
-    if not update.message:
-        return
-
-    if SERVICE_USERNAME:
-
-        username = SERVICE_USERNAME.replace("@", "").strip()
-
-        keyboard = [
-            [
-                InlineKeyboardButton(
-                    "联系人工客服",
-                    url=f"https://t.me/{username}"
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    "返回业务菜单",
-                    callback_data="back_menu"
-                )
-            ],
-        ]
-
-        await update.message.reply_text(
-            "人工客服\n\n"
-            "点击下面按钮联系人工客服。",
-            reply_markup=InlineKeyboardMarkup(keyboard),
-        )
-
-    else:
-
-        await update.message.reply_text(
-            "人工客服\n\n"
-            "目前尚未设置客服账号。",
-            reply_markup=bot_business_menu(),
-        )
-
-
-# ============================================================
-# /guide
-# ============================================================
-
-async def guide_command(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
-
-    if not update.message:
-        return
-
-    await update.message.reply_text(
-        BUSINESS_TEXT["guide"],
-        reply_markup=bot_business_menu(),
-    )
-
-
-# ============================================================
-# /verify
-# ============================================================
-
-async def verify_command(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
-
-    if not update.message:
-        return
-
-    await update.message.reply_text(
-        BUSINESS_TEXT["verify"],
-        reply_markup=bot_business_menu(),
-    )
-
-
-# ============================================================
-# 按钮处理
-# ============================================================
-
-async def button_handler(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
-
-    query = update.callback_query
-
-    await query.answer()
-
-    action = query.data
-
-    if action == "back_menu":
-
-        await query.edit_message_text(
-            "业务菜单\n\n"
-            "请选择您要办理的业务：",
-            reply_markup=bot_business_menu(),
-        )
-
-        return
-
-    text = BUSINESS_TEXT.get(
-        action,
-        "暂时没有找到对应业务。"
-    )
-
-    keyboard = []
-
-    if SERVICE_USERNAME:
-
-        username = SERVICE_USERNAME.replace("@", "").strip()
-
-        keyboard.append([
-            InlineKeyboardButton(
-                "联系人工客服",
-                url=f"https://t.me/{username}"
-            )
-        ])
-
-    keyboard.append([
-        InlineKeyboardButton(
-            "返回业务菜单",
-            callback_data="back_menu"
-        )
-    ])
-
-    await query.edit_message_text(
-        text=text,
-        reply_markup=InlineKeyboardMarkup(keyboard),
-    )
-
-
-# ============================================================
-# 普通消息
-# ============================================================
+# =========================
+# 菜单消息处理
+# =========================
 
 async def message_handler(
     update: Update,
@@ -383,58 +176,29 @@ async def message_handler(
     if not update.message:
         return
 
-    text = update.message.text or ""
+    text = (update.message.text or "").strip()
 
-    if "t.me/" in text or "telegram.me/" in text:
+    # 点击菜单
+    if text in BUSINESS:
 
         await update.message.reply_text(
-            "已收到您发送的群组链接。\n\n"
-            "如需人工核验，请联系客服。",
-            reply_markup=bot_business_menu(),
+            BUSINESS[text],
+            reply_markup=main_menu()
         )
 
         return
 
+    # 群编号 / 普通消息
     await update.message.reply_text(
-        "请选择您要办理的业务：",
-        reply_markup=bot_business_menu(),
+        "已收到您的消息。\n\n"
+        "请点击下方菜单选择需要办理的业务。",
+        reply_markup=main_menu()
     )
 
 
-# ============================================================
-# 设置 Telegram 左下角 Menu
-# ============================================================
-
-async def post_init(
-    application: Application
-):
-
-    # 设置命令
-    await application.bot.set_my_commands([
-        BotCommand("start", "开始使用"),
-        BotCommand("menu", "业务菜单"),
-        BotCommand("service", "联系客服"),
-        BotCommand("guide", "新手必读"),
-        BotCommand("verify", "自助验群"),
-    ])
-
-    # 左下角 Menu 打开 Web App
-    await application.bot.set_chat_menu_button(
-        menu_button=MenuButtonWebApp(
-            text="业务菜单",
-            web_app=WebAppInfo(
-                url=BASE_URL
-            )
-        )
-    )
-
-    logger.info("Telegram Menu 已设置")
-    logger.info("Web App: %s", BASE_URL)
-
-
-# ============================================================
+# =========================
 # 错误处理
-# ============================================================
+# =========================
 
 async def error_handler(
     update: object,
@@ -442,14 +206,14 @@ async def error_handler(
 ):
 
     logger.error(
-        "机器人发生错误:",
+        "机器人发生错误",
         exc_info=context.error
     )
 
 
-# ============================================================
-# 主程序
-# ============================================================
+# =========================
+# 启动
+# =========================
 
 def main():
 
@@ -458,42 +222,18 @@ def main():
             "没有找到 BOT_TOKEN，请检查 Render 环境变量。"
         )
 
-    if not BASE_URL:
-        raise RuntimeError(
-            "没有找到 BASE_URL。"
-        )
-
     application = (
         Application.builder()
         .token(BOT_TOKEN)
-        .post_init(post_init)
         .build()
     )
 
+    # /start
     application.add_handler(
         CommandHandler("start", start)
     )
 
-    application.add_handler(
-        CommandHandler("menu", menu)
-    )
-
-    application.add_handler(
-        CommandHandler("service", service)
-    )
-
-    application.add_handler(
-        CommandHandler("guide", guide_command)
-    )
-
-    application.add_handler(
-        CommandHandler("verify", verify_command)
-    )
-
-    application.add_handler(
-        CallbackQueryHandler(button_handler)
-    )
-
+    # 普通消息 + 菜单
     application.add_handler(
         MessageHandler(
             filters.TEXT & ~filters.COMMAND,
@@ -501,6 +241,7 @@ def main():
         )
     )
 
+    # 错误处理
     application.add_error_handler(
         error_handler
     )
@@ -520,6 +261,7 @@ def main():
         webhook_url
     )
 
+    # Render Webhook
     application.run_webhook(
         listen="0.0.0.0",
         port=PORT,
