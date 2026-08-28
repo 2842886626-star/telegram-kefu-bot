@@ -6,6 +6,8 @@ from telegram import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     BotCommand,
+    MenuButtonWebApp,
+    WebAppInfo,
 )
 from telegram.ext import (
     Application,
@@ -17,12 +19,26 @@ from telegram.ext import (
 )
 
 # ============================================================
-# 基础设置
+# 配置
 # ============================================================
 
-BOT_TOKEN = os.getenv("BOT_TOKEN", "")
-BASE_URL = os.getenv("BASE_URL", "").rstrip("/")
-SERVICE_USERNAME = os.getenv("SERVICE_USERNAME", "").strip()
+BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
+BASE_URL = os.getenv(
+    "BASE_URL",
+    "https://telegram-kefu-bot.onrender.com"
+).rstrip("/")
+
+SERVICE_USERNAME = os.getenv(
+    "SERVICE_USERNAME",
+    ""
+).strip()
+
+PORT = int(os.getenv("PORT", "10000"))
+
+
+# ============================================================
+# 日志
+# ============================================================
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -33,31 +49,139 @@ logger = logging.getLogger(__name__)
 
 
 # ============================================================
-# 主业务菜单
+# 业务内容
 # ============================================================
 
-def main_menu():
+BUSINESS_TEXT = {
+    "special_group": (
+        "拉专群\n\n"
+        "如需创建或咨询专属群组，请联系客服。\n\n"
+        "请提供：\n"
+        "• 群组用途\n"
+        "• 预计人数\n"
+        "• 需要的服务"
+    ),
+
+    "public_group": (
+        "开公群\n\n"
+        "如需创建公开群组，请联系客服。\n\n"
+        "请提供：\n"
+        "• 群组名称\n"
+        "• 群组类型\n"
+        "• 群组用途"
+    ),
+
+    "consult": (
+        "咨询 / 解封\n\n"
+        "如果您的账号、群组或相关业务遇到问题，"
+        "可以联系客服进行咨询。\n\n"
+        "请尽量提供详细情况。"
+    ),
+
+    "ad_member": (
+        "广告 / 会员\n\n"
+        "如需咨询广告发布、会员服务等业务，"
+        "请联系客服了解具体方案。"
+    ),
+
+    "report": (
+        "纠纷 / 举报\n\n"
+        "如发现违规内容或存在纠纷，请提交相关信息。\n\n"
+        "建议提供：\n"
+        "• 群组 / 用户信息\n"
+        "• 相关截图\n"
+        "• 具体问题描述"
+    ),
+
+    "resource": (
+        "资源对接\n\n"
+        "如有合作、资源交换或商务对接需求，"
+        "请联系客服。"
+    ),
+
+    "suggestion": (
+        "投诉建议\n\n"
+        "如果您对服务有意见、建议或投诉，"
+        "可以提交相关情况。"
+    ),
+
+    "verify": (
+        "自助验群\n\n"
+        "请输入您所在的群编号进行验证。"
+    ),
+
+    "restore": (
+        "销群恢复\n\n"
+        "如果群组出现异常、误操作或需要恢复相关服务，"
+        "请联系客服咨询。"
+    ),
+
+    "guide": (
+        "新手必读\n\n"
+        "1. 请勿相信陌生人发送的可疑链接。\n"
+        "2. 不要向任何人泄露密码或验证码。\n"
+        "3. 办理业务时请提供准确的信息。\n"
+        "4. 遇到问题可以联系客服。"
+    ),
+}
+
+
+# ============================================================
+# 机器人消息里的业务菜单
+# ============================================================
+
+def bot_business_menu():
 
     keyboard = [
         [
-            InlineKeyboardButton("📌 拉专群", callback_data="special_group"),
-            InlineKeyboardButton("📢 开公群", callback_data="public_group"),
+            InlineKeyboardButton(
+                "拉专群",
+                callback_data="special_group"
+            ),
+            InlineKeyboardButton(
+                "开公群",
+                callback_data="public_group"
+            ),
         ],
         [
-            InlineKeyboardButton("💬 咨询 / 解封", callback_data="consult"),
-            InlineKeyboardButton("💰 广告 / 会员", callback_data="ad_member"),
+            InlineKeyboardButton(
+                "咨询 / 解封",
+                callback_data="consult"
+            ),
+            InlineKeyboardButton(
+                "广告 / 会员",
+                callback_data="ad_member"
+            ),
         ],
         [
-            InlineKeyboardButton("🚨 纠纷 / 举报", callback_data="report"),
-            InlineKeyboardButton("🤝 资源对接", callback_data="resource"),
+            InlineKeyboardButton(
+                "纠纷 / 举报",
+                callback_data="report"
+            ),
+            InlineKeyboardButton(
+                "资源对接",
+                callback_data="resource"
+            ),
         ],
         [
-            InlineKeyboardButton("📝 投诉建议", callback_data="suggestion"),
-            InlineKeyboardButton("🔎 自助验群", callback_data="verify"),
+            InlineKeyboardButton(
+                "投诉建议",
+                callback_data="suggestion"
+            ),
+            InlineKeyboardButton(
+                "自助验群",
+                callback_data="verify"
+            ),
         ],
         [
-            InlineKeyboardButton("♻️ 销群恢复", callback_data="restore"),
-            InlineKeyboardButton("📖 新手必读", callback_data="guide"),
+            InlineKeyboardButton(
+                "销群恢复",
+                callback_data="restore"
+            ),
+            InlineKeyboardButton(
+                "新手必读",
+                callback_data="guide"
+            ),
         ],
     ]
 
@@ -68,7 +192,10 @@ def main_menu():
 # /start
 # ============================================================
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def start(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
 
     if not update.message:
         return
@@ -77,13 +204,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "您好，这里是在线人工客服。\n\n"
         "请点击下方对应的业务板块，"
         "选择您要办理的业务。\n\n"
-        "🔎 验群请点击下方「自助验群」，"
+        "验群请点击「自助验群」，"
         "输入您所在的群编号进行验证。"
     )
 
     await update.message.reply_text(
         text,
-        reply_markup=main_menu(),
+        reply_markup=bot_business_menu(),
     )
 
 
@@ -91,15 +218,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # /menu
 # ============================================================
 
-async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def menu(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
 
     if not update.message:
         return
 
     await update.message.reply_text(
-        "📋 业务菜单\n\n"
+        "业务菜单\n\n"
         "请选择您要办理的业务：",
-        reply_markup=main_menu(),
+        reply_markup=bot_business_menu(),
     )
 
 
@@ -107,7 +237,10 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # /service
 # ============================================================
 
-async def service(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def service(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
 
     if not update.message:
         return
@@ -119,30 +252,30 @@ async def service(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [
             [
                 InlineKeyboardButton(
-                    "👨‍💻 联系人工客服",
-                    url=f"https://t.me/{username}",
+                    "联系人工客服",
+                    url=f"https://t.me/{username}"
                 )
             ],
             [
                 InlineKeyboardButton(
-                    "⬅️ 返回业务菜单",
-                    callback_data="back_menu",
+                    "返回业务菜单",
+                    callback_data="back_menu"
                 )
             ],
         ]
 
         await update.message.reply_text(
-            "💬 联系人工客服\n\n"
-            "请点击下面按钮联系人工客服。",
+            "人工客服\n\n"
+            "点击下面按钮联系人工客服。",
             reply_markup=InlineKeyboardMarkup(keyboard),
         )
 
     else:
 
         await update.message.reply_text(
-            "💬 联系人工客服\n\n"
-            "目前还没有设置客服账号。",
-            reply_markup=main_menu(),
+            "人工客服\n\n"
+            "目前尚未设置客服账号。",
+            reply_markup=bot_business_menu(),
         )
 
 
@@ -150,18 +283,17 @@ async def service(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # /guide
 # ============================================================
 
-async def guide(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def guide_command(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
 
     if not update.message:
         return
 
     await update.message.reply_text(
-        "📖 新手必读\n\n"
-        "1. 请勿相信陌生人发送的可疑链接。\n"
-        "2. 不要向任何人泄露密码或验证码。\n"
-        "3. 办理业务时请提供准确的信息。\n"
-        "4. 遇到问题可以联系客服。",
-        reply_markup=main_menu(),
+        BUSINESS_TEXT["guide"],
+        reply_markup=bot_business_menu(),
     )
 
 
@@ -169,93 +301,27 @@ async def guide(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # /verify
 # ============================================================
 
-async def verify(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def verify_command(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
 
     if not update.message:
         return
 
     await update.message.reply_text(
-        "🔎 自助验群\n\n"
-        "请将您所在的群编号发送给机器人进行验证。\n\n"
-        "例如：\n"
-        "123456",
-        reply_markup=main_menu(),
+        BUSINESS_TEXT["verify"],
+        reply_markup=bot_business_menu(),
     )
 
 
 # ============================================================
-# 业务回复
-# ============================================================
-
-BUSINESS_TEXT = {
-
-    "special_group":
-        "📌 拉专群\n\n"
-        "如需创建或咨询专属群组，请联系客服。\n\n"
-        "请提供：\n"
-        "• 群组用途\n"
-        "• 预计人数\n"
-        "• 需要的服务",
-
-    "public_group":
-        "📢 开公群\n\n"
-        "如需创建公开群组，请联系客服。\n\n"
-        "请提供：\n"
-        "• 群组名称\n"
-        "• 群组类型\n"
-        "• 群组用途",
-
-    "consult":
-        "💬 咨询 / 解封\n\n"
-        "如果您的账号、群组或相关业务遇到问题，"
-        "可以联系客服进行咨询。\n\n"
-        "请尽量提供详细情况。",
-
-    "ad_member":
-        "💰 广告 / 会员\n\n"
-        "如需咨询广告发布、会员服务等业务，"
-        "请联系客服了解具体方案。",
-
-    "report":
-        "🚨 纠纷 / 违规举报\n\n"
-        "如发现违规内容或存在纠纷，请提交相关信息。\n\n"
-        "建议提供：\n"
-        "• 群组 / 用户信息\n"
-        "• 相关截图\n"
-        "• 具体问题描述",
-
-    "resource":
-        "🤝 资源对接\n\n"
-        "如有合作、资源交换或商务对接需求，"
-        "请联系客服。",
-
-    "suggestion":
-        "📝 投诉建议\n\n"
-        "如果您对服务有意见、建议或投诉，"
-        "可以提交相关情况。",
-
-    "verify":
-        "🔎 自助验群\n\n"
-        "请将您所在的群编号发送给机器人进行验证。",
-
-    "restore":
-        "♻️ 销群恢复\n\n"
-        "如果群组出现异常、误操作或需要恢复相关服务，"
-        "请联系客服咨询。",
-
-    "guide":
-        "📖 新手必读\n\n"
-        "请注意账号安全，不要泄露密码、验证码等信息。",
-}
-
-
-# ============================================================
-# Inline 按钮处理
+# 按钮处理
 # ============================================================
 
 async def button_handler(
     update: Update,
-    context: ContextTypes.DEFAULT_TYPE,
+    context: ContextTypes.DEFAULT_TYPE
 ):
 
     query = update.callback_query
@@ -264,40 +330,38 @@ async def button_handler(
 
     action = query.data
 
-    # 返回主菜单
     if action == "back_menu":
 
         await query.edit_message_text(
-            "您好，请选择您要办理的业务：",
-            reply_markup=main_menu(),
+            "业务菜单\n\n"
+            "请选择您要办理的业务：",
+            reply_markup=bot_business_menu(),
         )
 
         return
 
     text = BUSINESS_TEXT.get(
         action,
-        "暂时没有找到对应业务。",
+        "暂时没有找到对应业务。"
     )
 
     keyboard = []
 
-    # 联系客服
     if SERVICE_USERNAME:
 
         username = SERVICE_USERNAME.replace("@", "").strip()
 
         keyboard.append([
             InlineKeyboardButton(
-                "👨‍💻 联系人工客服",
-                url=f"https://t.me/{username}",
+                "联系人工客服",
+                url=f"https://t.me/{username}"
             )
         ])
 
-    # 返回
     keyboard.append([
         InlineKeyboardButton(
-            "⬅️ 返回业务菜单",
-            callback_data="back_menu",
+            "返回业务菜单",
+            callback_data="back_menu"
         )
     ])
 
@@ -313,7 +377,7 @@ async def button_handler(
 
 async def message_handler(
     update: Update,
-    context: ContextTypes.DEFAULT_TYPE,
+    context: ContextTypes.DEFAULT_TYPE
 ):
 
     if not update.message:
@@ -321,30 +385,31 @@ async def message_handler(
 
     text = update.message.text or ""
 
-    # 群链接
     if "t.me/" in text or "telegram.me/" in text:
 
         await update.message.reply_text(
-            "🔎 已收到您发送的信息。\n\n"
+            "已收到您发送的群组链接。\n\n"
             "如需人工核验，请联系客服。",
-            reply_markup=main_menu(),
+            reply_markup=bot_business_menu(),
         )
 
         return
 
-    # 普通文字
     await update.message.reply_text(
-        "您好，请点击下面的业务菜单选择您要办理的业务：",
-        reply_markup=main_menu(),
+        "请选择您要办理的业务：",
+        reply_markup=bot_business_menu(),
     )
 
 
 # ============================================================
-# Telegram 左下角 Menu
+# 设置 Telegram 左下角 Menu
 # ============================================================
 
-async def post_init(application):
+async def post_init(
+    application: Application
+):
 
+    # 设置命令
     await application.bot.set_my_commands([
         BotCommand("start", "开始使用"),
         BotCommand("menu", "业务菜单"),
@@ -353,7 +418,18 @@ async def post_init(application):
         BotCommand("verify", "自助验群"),
     ])
 
-    logger.info("Telegram Menu 设置成功")
+    # 左下角 Menu 打开 Web App
+    await application.bot.set_chat_menu_button(
+        menu_button=MenuButtonWebApp(
+            text="业务菜单",
+            web_app=WebAppInfo(
+                url=BASE_URL
+            )
+        )
+    )
+
+    logger.info("Telegram Menu 已设置")
+    logger.info("Web App: %s", BASE_URL)
 
 
 # ============================================================
@@ -362,12 +438,12 @@ async def post_init(application):
 
 async def error_handler(
     update: object,
-    context: ContextTypes.DEFAULT_TYPE,
+    context: ContextTypes.DEFAULT_TYPE
 ):
 
     logger.error(
         "机器人发生错误:",
-        exc_info=context.error,
+        exc_info=context.error
     )
 
 
@@ -384,7 +460,7 @@ def main():
 
     if not BASE_URL:
         raise RuntimeError(
-            "没有找到 BASE_URL，请检查 Render 环境变量。"
+            "没有找到 BASE_URL。"
         )
 
     application = (
@@ -407,11 +483,11 @@ def main():
     )
 
     application.add_handler(
-        CommandHandler("guide", guide)
+        CommandHandler("guide", guide_command)
     )
 
     application.add_handler(
-        CommandHandler("verify", verify)
+        CommandHandler("verify", verify_command)
     )
 
     application.add_handler(
@@ -421,16 +497,12 @@ def main():
     application.add_handler(
         MessageHandler(
             filters.TEXT & ~filters.COMMAND,
-            message_handler,
+            message_handler
         )
     )
 
     application.add_error_handler(
         error_handler
-    )
-
-    port = int(
-        os.getenv("PORT", "10000")
     )
 
     webhook_path = "telegram-webhook"
@@ -450,7 +522,7 @@ def main():
 
     application.run_webhook(
         listen="0.0.0.0",
-        port=port,
+        port=PORT,
         url_path=webhook_path,
         webhook_url=webhook_url,
         drop_pending_updates=True,
